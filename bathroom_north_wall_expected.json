@@ -1,0 +1,33 @@
+{
+  "wall_id": "bathroom_north_wall",
+  "room": "Bathroom",
+  "wall_name": "North Wall",
+
+  "wall": {
+    "width_ft": 5.0,
+    "height_ft": 8.0
+  },
+
+  "openings": [
+    {
+      "opening_id": "W1",
+      "type": "window",
+      "label": "Bathroom Window",
+
+      "position": {
+        "x_center_ft": 2.5,
+        "sill_height_ft": 3.92
+      },
+
+      "size": {
+        "width_ft": 3.92,
+        "height_ft": 1.5
+      }
+    }
+  ],
+
+  "tolerance": {
+    "position_ft": 0.5,
+    "size_ft": 0.5
+  }
+}

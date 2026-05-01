@@ -1,0 +1,48 @@
+{
+  "wall_id": "bedroom_3_west_wall",
+  "room": "Bedroom 3",
+  "wall_name": "West Wall",
+
+  "wall": {
+    "width_ft": 11.75,
+    "height_ft": 8.0
+  },
+
+  "openings": [
+    {
+      "opening_id": "D1",
+      "type": "door",
+      "label": "H.C. Door",
+
+      "position": {
+        "x_center_ft": 1.58,
+        "sill_height_ft": 0.0
+      },
+
+      "size": {
+        "width_ft": 2.5,
+        "height_ft": 6.67
+      }
+    },
+    {
+      "opening_id": "D2",
+      "type": "door",
+      "label": "Pocket Door",
+
+      "position": {
+        "x_center_ft": 6.67,
+        "sill_height_ft": 0.0
+      },
+
+      "size": {
+        "width_ft": 2.67,
+        "height_ft": 6.67
+      }
+    }
+  ],
+
+  "tolerance": {
+    "position_ft": 0.5,
+    "size_ft": 0.25
+  }
+}

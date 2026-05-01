@@ -1,28 +1,30 @@
 # “””
-Wall Verification System - Backend
+Wall Verification System - Step A
 
-Flask app for managing wall JSONs and photo analysis.
+Simple Flask app for managing wall JSONs.
 
 Features:
 
 - Upload expected JSON for a wall (persists)
 - List saved walls
 - Delete walls
-- Analyze photos against saved walls
-- Return PASS/WARNING/FAIL results
+
+This is Step A only. Step B (photo upload + analysis) coming next.
+
+Deploy to Railway:
+
+- Just push to GitHub
+- Railway auto-deploys
 
 Run locally:
-pip install flask flask-cors opencv-python numpy pillow
+pip install -r requirements.txt
 python app.py
-
-Then visit: http://localhost:5000
 “””
 
-from flask import Flask, request, jsonify, send_file
+from flask import Flask, request, jsonify
 from flask_cors import CORS
 import json
 import os
-import shutil
 from pathlib import Path
 from datetime import datetime
 
@@ -51,7 +53,10 @@ WALLS_DB.write_text(json.dumps({}))
 
 def load_walls_db():
 “”“Load all walls from storage”””
+try:
 return json.loads(WALLS_DB.read_text())
+except:
+return {}
 
 def save_walls_db(data):
 “”“Save walls to storage”””
@@ -59,14 +64,11 @@ WALLS_DB.write_text(json.dumps(data, indent=2))
 
 # ============================================================
 
-# ROUTES
+# FRONTEND HTML
 
 # ============================================================
 
-@app.route(’/’, methods=[‘GET’])
-def index():
-“”“Serve the frontend HTML”””
-html = “””
+HTML = “””
 
 <!DOCTYPE html>
 
@@ -74,19 +76,16 @@ html = “””
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Wall Verification System</title>
+    <title>Wall Verification</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
 
 ```
     body {
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         background: #f5f5f5;
         padding: 20px;
+        min-height: 100vh;
     }
     
     .container {
@@ -116,7 +115,7 @@ html = “””
     
     .section-title {
         color: #333;
-        font-size: 16px;
+        font-size: 14px;
         font-weight: 600;
         margin-bottom: 12px;
         text-transform: uppercase;
@@ -129,13 +128,12 @@ html = “””
         padding: 24px;
         text-align: center;
         cursor: pointer;
-        transition: all 0.3s;
         background: #f9f9f9;
+        transition: all 0.2s;
     }
     
     .upload-area:hover {
         background: #f0f5ff;
-        border-color: #0d47a1;
     }
     
     .upload-area input {
@@ -146,21 +144,12 @@ html = “””
         background: #1f77b4;
         color: white;
         border: none;
-        padding: 12px 24px;
-        border-radius: 6px;
+        padding: 14px 24px;
+        border-radius: 8px;
         font-size: 16px;
         font-weight: 600;
         cursor: pointer;
-        transition: all 0.3s;
         width: 100%;
-    }
-    
-    .upload-button:hover {
-        background: #0d47a1;
-    }
-    
-    .upload-button:active {
-        transform: scale(0.98);
     }
     
     .walls-list {
@@ -176,59 +165,51 @@ html = “””
         display: flex;
         justify-content: space-between;
         align-items: center;
+        gap: 8px;
     }
     
     .wall-info {
         flex: 1;
+        min-width: 0;
     }
     
     .wall-id {
         font-weight: 600;
         color: #333;
         font-size: 16px;
+        margin-bottom: 4px;
     }
     
     .wall-meta {
         font-size: 12px;
         color: #999;
-        margin-top: 4px;
     }
     
     .wall-actions {
         display: flex;
         gap: 8px;
+        flex-shrink: 0;
     }
     
     .btn-select {
         background: #2ecc71;
         color: white;
         border: none;
-        padding: 8px 16px;
+        padding: 10px 16px;
         border-radius: 6px;
         font-size: 14px;
         font-weight: 600;
         cursor: pointer;
-        transition: all 0.3s;
-    }
-    
-    .btn-select:hover {
-        background: #27ae60;
     }
     
     .btn-delete {
         background: #e74c3c;
         color: white;
         border: none;
-        padding: 8px 16px;
+        padding: 10px 12px;
         border-radius: 6px;
-        font-size: 14px;
-        font-weight: 600;
+        font-size: 16px;
         cursor: pointer;
-        transition: all 0.3s;
-    }
-    
-    .btn-delete:hover {
-        background: #c0392b;
     }
     
     .empty-state {
@@ -247,24 +228,25 @@ html = “””
         border-radius: 6px;
         margin-bottom: 16px;
         font-size: 14px;
+        display: none;
     }
     
     .message.success {
         background: #d4edda;
         color: #155724;
-        border: 1px solid #c3e6cb;
+        display: block;
     }
     
     .message.error {
         background: #f8d7da;
         color: #721c24;
-        border: 1px solid #f5c6cb;
+        display: block;
     }
     
     .message.loading {
         background: #cfe2ff;
         color: #084298;
-        border: 1px solid #b6d4fe;
+        display: block;
     }
 </style>
 ```
@@ -273,24 +255,24 @@ html = “””
 <body>
     <div class="container">
         <h1>🏗️ Wall Verification</h1>
-        <p class="subtitle">Upload expected wall JSONs and select to analyze photos</p>
+        <p class="subtitle">Upload expected wall JSONs and select a wall to analyze.</p>
 
 ```
-    <div id="message"></div>
+    <div id="message" class="message"></div>
     
-    <!-- SECTION 1: Upload JSON -->
     <div class="section">
         <div class="section-title">Step 1: Upload Wall JSON</div>
-        <div class="upload-area" onclick="document.getElementById('jsonInput').click()">
-            <input type="file" id="jsonInput" accept=".json" />
-            <button class="upload-button">📁 Choose Expected JSON File</button>
+        <label class="upload-area" for="jsonInput">
+            <input type="file" id="jsonInput" accept=".json,application/json" />
+            <button type="button" class="upload-button" onclick="document.getElementById('jsonInput').click()">
+                📁 Choose Expected JSON File
+            </button>
             <p style="margin-top: 12px; color: #999; font-size: 13px;">
                 Select a wall's expected JSON file
             </p>
-        </div>
+        </label>
     </div>
     
-    <!-- SECTION 2: Saved Walls -->
     <div class="section">
         <div class="section-title">Step 2: Select Wall to Analyze</div>
         <ul id="wallsList" class="walls-list"></ul>
@@ -302,10 +284,7 @@ html = “””
 </div>
 
 <script>
-    // File input handler
     document.getElementById('jsonInput').addEventListener('change', handleJsonUpload);
-    
-    // Load walls on page load
     loadWalls();
     
     async function handleJsonUpload(event) {
@@ -355,21 +334,18 @@ html = “””
                 data.walls.forEach(wall => {
                     const li = document.createElement('li');
                     li.className = 'wall-item';
+                    const displayName = wall.room || wall.wall_name || wall.wall_id;
+                    const date = wall.uploaded_at ? new Date(wall.uploaded_at).toLocaleDateString() : '?';
                     li.innerHTML = `
                         <div class="wall-info">
-                            <div class="wall-id">${wall.room || wall.wall_name || wall.wall_id}</div>
+                            <div class="wall-id">${displayName}</div>
                             <div class="wall-meta">
-                                ${wall.openings_count || '?'} opening(s) expected
-                                · uploaded ${new Date(wall.uploaded_at).toLocaleDateString()}
+                                ${wall.openings_count} opening(s) · ${date}
                             </div>
                         </div>
                         <div class="wall-actions">
-                            <button class="btn-select" onclick="selectWall('${wall.wall_id}')">
-                                📸 Analyze
-                            </button>
-                            <button class="btn-delete" onclick="deleteWall('${wall.wall_id}')">
-                                🗑️
-                            </button>
+                            <button class="btn-select" onclick="selectWall('${wall.wall_id}')">📸</button>
+                            <button class="btn-delete" onclick="deleteWall('${wall.wall_id}')">🗑️</button>
                         </div>
                     `;
                     wallsList.appendChild(li);
@@ -381,18 +357,14 @@ html = “””
     }
     
     function selectWall(wallId) {
-        // TODO: Navigate to photo upload screen (Step B)
-        alert(`Selected wall: ${wallId}\n\nStep B (photo upload) coming soon!`);
+        alert(`Selected wall: ${wallId}\\n\\nStep B (photo upload + analysis) coming soon!`);
     }
     
     async function deleteWall(wallId) {
-        if (!confirm(`Delete this wall?`)) return;
+        if (!confirm('Delete this wall?')) return;
         
         try {
-            const response = await fetch(`/api/walls/${wallId}`, {
-                method: 'DELETE'
-            });
-            
+            const response = await fetch(`/api/walls/${wallId}`, { method: 'DELETE' });
             const result = await response.json();
             
             if (response.ok) {
@@ -410,11 +382,10 @@ html = “””
         const messageEl = document.getElementById('message');
         messageEl.textContent = text;
         messageEl.className = `message ${type}`;
-        messageEl.style.display = 'block';
         
         if (type !== 'loading') {
             setTimeout(() => {
-                messageEl.style.display = 'none';
+                messageEl.className = 'message';
             }, 4000);
         }
     }
@@ -423,8 +394,23 @@ html = “””
 
 </body>
 </html>
-    """
-    return html
+"""
+
+# ============================================================
+
+# ROUTES
+
+# ============================================================
+
+@app.route(’/’, methods=[‘GET’])
+def index():
+“”“Serve the frontend HTML”””
+return HTML
+
+@app.route(’/health’, methods=[‘GET’])
+def health():
+“”“Health check for Railway”””
+return jsonify({‘status’: ‘ok’}), 200
 
 @app.route(’/api/walls’, methods=[‘GET’])
 def list_walls():
@@ -457,7 +443,6 @@ if file.filename == '':
     return jsonify({'error': 'No file selected'}), 400
 
 try:
-    # Read and parse JSON
     expected_data = json.load(file)
     wall_id = expected_data.get('wall_id')
     
@@ -505,9 +490,7 @@ return jsonify({'success': True, 'message': 'Wall deleted'}), 200
 
 # ============================================================
 
-if __name__ == '__main__':
-    import os
-    port = int(os.environ.get('PORT', 5000))
-    print("🚀 Wall Verification System starting...")
-    print(f"📍 http://localhost:{port}")
-    app.run(debug=False, host='0.0.0.0', port=port)
+if **name** == ‘**main**’:
+port = int(os.environ.get(‘PORT’, 5000))
+print(f”🚀 Wall Verification System starting on port {port}…”)
+app.run(debug=False, host=‘0.0.0.0’, port=port)
